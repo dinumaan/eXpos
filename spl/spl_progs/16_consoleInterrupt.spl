@@ -1,0 +1,40 @@
+//1
+[PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1]*16) + 13] = SP;
+
+//2
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1]*16) + 11]*512 - 1;
+
+//3
+backup;
+
+//4
+alias reqPID R0;
+reqPID = [TERMINAL_STATUS_TABLE + 1];
+
+//5
+alias process_table_entry R1;
+process_table_entry = PROCESS_TABLE + reqPID*16;
+
+//6
+[process_table_entry + 8] = P0;
+
+// 7
+backup;
+
+// 8
+R1 = 9;
+R2 = reqPID;
+
+//9
+call MOD_0;
+
+//10
+restore;
+
+//11
+restore;
+
+//12
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1]*16) + 13];
+
+ireturn;

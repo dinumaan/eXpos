@@ -1,0 +1,13 @@
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP; // store user sp
+
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1; // Setting SP to UArea Page number * 512 - 1 or set sp to 
+
+backup; // backup user context
+
+print "TIMER"; // print dummy things here 
+
+restore; // restore user context 
+
+SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13]; // set back to sp 
+
+ireturn; // go back to user mode 

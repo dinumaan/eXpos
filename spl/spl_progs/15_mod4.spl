@@ -1,0 +1,36 @@
+// we will implement only terminal write func (func num 3) only 
+
+alias functionNum R1;
+alias currentPID R2;
+alias word R3;
+
+// calling acquire terminal 
+if(functionNum == 3)then
+	multipush(R1, R2, R3);
+	
+	R1 = 8; // acquire terminal func num is 3
+	
+	R2 = currentPID;
+
+	call MOD_0; // call rescourse manager module 0
+
+	multipop(R1, R2, R3); // restore the register
+	
+	print word; //  print word
+	
+	// our printing part is done now we have to call Release terminal func 
+	multipush(R1, R2, R3);
+	
+	R1 = 9; //Release terminal func num is 9
+	
+	R2 = currentPID;
+	
+	call MOD_0; 
+	
+	multipop(R1, R2, R3);
+	
+	return;
+else 
+	return;
+endif;
+	

@@ -1,0 +1,51 @@
+//2
+if(R1 == GET_FREE_PAGE)then
+	//3
+	[SYSTEM_STATUS_TABLE + 3] = [SYSTEM_STATUS_TABLE + 3] + 1;
+	
+	//4
+	while([SYSTEM_STATUS_TABLE + 2] == 0)do
+		[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 4] = WAIT_MEM;
+		backup;
+		call MOD_5;
+		restore;
+	endwhile;
+	
+	//5
+	[SYSTEM_STATUS_TABLE + 3] = [SYSTEM_STATUS_TABLE + 3] - 1;
+	[SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] - 1;
+	
+	//6
+	alias i R0;
+	i = 76;
+	while(i<MAX_MEM_PAGE) do
+		if([MEMORY_FREE_LIST+i]==0) then
+			[MEMORY_FREE_LIST+i] = 1;
+			break;
+		endif;
+		i = i + 1;
+	endwhile;
+	
+	//7
+	return;
+endif;
+
+if(R1 == RELEASE_PAGE)then
+	[MEMORY_FREE_LIST + R2] = [MEMORY_FREE_LIST + R2] - 1;
+	if([MEMORY_FREE_LIST + R2] == 0)then
+		[SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] + 1;
+	
+		alias i R3;
+	
+		while(i <  16)do
+			if([PROCESS_TABLE + i*16 + 4] ==  WAIT_MEM)then
+				[PROCESS_TABLE + i*16 + 4] = READY;
+			endif;
+			i = i + 1;
+		endwhile;
+	
+	endif;
+
+	return;
+endif;
+

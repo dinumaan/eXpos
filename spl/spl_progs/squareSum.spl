@@ -1,0 +1,15 @@
+alias cnt R0;
+
+alias sum R1;
+
+sum = 0;
+
+cnt = 1;
+
+while(cnt <= 20) do
+	sum = sum + cnt*cnt;
+	cnt = cnt + 1;
+endwhile;
+
+print sum;	
+
