@@ -1,0 +1,239 @@
+// create and delete sys calls and sys call number are 1 and 4
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13] = SP;
+alias userSP R1;
+userSP = SP;
+
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11]*512 - 1;
+
+alias syscall R2;
+
+syscall = [[PTBR + 2*(userSP-5)/512]*512 + (userSP-5)%512];
+
+alias ret_addr R10;
+ret_addr = [PTBR + 2 * ((userSP - 1) / 512)] * 512 + (userSP - 1) % 512;
+
+alias protable R11;
+protable = PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16; 
+
+//__________________________________CREATE________________________________
+
+// argument are filename and permission
+// return 0 if success ya file already exist 
+// return -1 if no free inode table entry found
+
+if(syscall == 1)then
+	[protable + 9] = 1;
+	
+	// get the argumnets from userStack
+	alias fileName R3;
+	alias permission R4;
+	fileName = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+	permission = [[PTBR + 2*((userSP-3)/512)]*512 + (userSP-3)%512];
+
+	// check if file is present
+	alias i R5 ;
+	i = 0;
+	while(i<MAX_FILE_NUM)do
+		if([INODE_TABLE + i*16 + 1] == fileName) then
+			print "File_per";
+			[protable + 9] = 0;
+			[ret_addr] = 0;
+			SP = [protable + 13];
+			ireturn;
+		endif;	
+		i = i+1;
+	endwhile;
+	
+	print "File_!present";
+
+	alias free_entry R6;
+	free_entry = -1;
+
+	i = 0;
+	while(i < MAX_FILE_NUM)do
+		if([INODE_TABLE + i*16 + 1] == -1) then
+			free_entry = i;
+			break;
+		endif;
+		i = i+1;
+	endwhile;
+
+	print "free_entry";
+	print free_entry;
+	
+	if(free_entry  == -1)then
+		[protable + 9] = 0;
+		[ret_addr] = -1;
+		SP = [protable + 13];
+
+		ireturn;
+	endif;
+
+	// updte inode table and root file
+
+	alias userID R7;
+	userID = [protable + 3];
+	[INODE_TABLE + free_entry*16 + 1] = fileName;
+	[INODE_TABLE + free_entry*16 + 2] = 0;	//file size
+	[INODE_TABLE + free_entry*16 + 0] = DATA;	//file type
+	[INODE_TABLE + free_entry*16 + 3] = userID;//USERID same as process's userID
+	[INODE_TABLE + free_entry*16 + 4] = permission;	//permission field
+	
+	[INODE_TABLE + free_entry*16 + 8] = -1;
+	//[INODE_TABLE + free_entry*16 + 9] = -1;
+	//[INODE_TABLE + free_entry*16 + 10] = -1;
+	//now update the root table file entries
+	//Each Root File entry consists of 8 words
+	//index of the inode table entry of a file and the index of its root file entry must match
+	[ROOT_FILE + free_entry*8 + 0] = fileName;	//file name field
+	[ROOT_FILE + free_entry*8 + 1] = 0;	//file size
+	[ROOT_FILE + free_entry*8 + 2] = DATA;
+	//set the username from USER_TABLE. Each User table entry consists of 2 words
+	//userid assigned to a user is the index of the corresp. entry in the user table
+	[ROOT_FILE + free_entry*8 + 3] = [USER_TABLE + userID*2 + 0];	//username field from user table
+	[ROOT_FILE + free_entry*8 + 4] = permission;
+
+	[protable + 9] = 0;	//reset the mode
+	[ret_addr] = 0;	//success
+	SP = [protable + 13];	//change to user stack
+
+	print "Success";
+
+	ireturn;
+endif;
+
+//________________________________________________________________________
+
+
+//_____________________________Delete_____________________________________
+
+// argumet is filename
+// return 0 if success ir filename doesn't exist
+// return -1 if permission denied
+// return -2 if file is open
+
+if(syscall == 4)then
+	[protable + 9] = 4;
+	
+	alias fileName R3;
+	fileName = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+	alias idx R4;
+	alias i R5;
+	idx = -1;
+	i = 0;
+	
+	while(i<MAX_FILE_NUM)do
+		if([INODE_TABLE + 16*i + 1] == fileName)then
+			idx = i;
+			break;
+		endif;
+		i = i+1;
+	endwhile;
+
+	if(idx == -1)then
+		print "file_not_present";
+		[protable + 9] = 0;
+		[ret_addr] = 0;
+		SP = [protable + 13];
+		ireturn;
+	endif;
+
+	if([INODE_TABLE + 16*idx + 0] != DATA) then
+		print "not_data_file";
+		[protable + 9] = 0;
+		[ret_addr] = -1;
+		SP = [protable + 13];
+		ireturn;
+	endif;
+
+	alias curr_userID R6;
+	curr_userID = [protable + 3];
+	
+	if([INODE_TABLE + 16*idx + 4] == 0)then
+		if(INODE_TABLE + 16*idx + 3 != curr_userID && curr_userID != 1)then
+			print "not_allowed_to_delete";
+			[protable + 9] = 0;
+			[ret_addr] = -1;
+			SP = [protable + 13];
+			ireturn;
+		endif;
+	endif;
+
+	print "allowed_to_delete";
+	
+	backup;
+	
+	R1 = ACQUIRE_INODE;
+	R2 = [SYSTEM_STATUS_TABLE + 1];
+	R3 = idx;
+	call MOD_0;
+	
+	restore;
+
+	if([FILE_STATUS_TABLE + 4*idx + 1] != -1) then
+		print "some_proc_opend_file";
+		restore;
+		
+		R1 = RELEASE_INODE;
+		R2 = [SYSTEM_STATUS_TABLE + 1];
+		R3 = idx;
+		call MOD_0;
+	
+		backup;
+		
+		[protable + 9] = 0;
+		[ret_addr] = -2;
+		SP = [protable + 13];
+		
+		ireturn;
+	endif;
+
+//If any of the disk blocks of deleted file are in buffer cache, and if buffer page is marked dirty,
+		//dirty bit needs to be set to 0 so that it does not write back into the disk
+		//check for the blocks in inode table entry
+		alias block_num R8;
+		i = 0;
+		while(i<4) do
+			block_num = [INODE_TABLE + 16*idx + 8 + i]; 
+			if(block_num != -1) then	//if block is present in buffer table and dirty bit is set
+				if([BUFFER_TABLE + 4*(i%4) + 0] == block_num && [BUFFER_TABLE + 4*(i%4) + 1] == 1) then
+					[BUFFER_TABLE + 4*(i%4) + 1] = 0;
+				endif;
+
+				backup;
+				R1 = RELEASE_BLOCK;	//free the block
+				R2 = block_num;
+				R3 = [SYSTEM_STATUS_TABLE+1];
+				call MOD_2;
+				restore;
+			endif;
+			i = i + 1;
+		endwhile;
+
+		[INODE_TABLE + 16*idx + 1] = -1;	//invalidate the inode table of the file
+		[ROOT_FILE + 8*idx + 0] = -1;	//invalidate the root file entry
+
+		backup;
+		R1 = RELEASE_INODE;	//unlock the file for other processes
+		R2 = [SYSTEM_STATUS_TABLE + 1];
+		R3 = idx;
+		call MOD_0;
+		restore;	
+
+		[ret_addr] = 0;	//successful deletion
+		[protable + 9] = 0;	//reset the mode
+		SP = [protable + 13];	//change to user stack
+
+		ireturn;
+		//Open file table is not updated when a file is deleted
+		//Open File Table stores the information about all the files that are open while the OS is running.
+		//We only delete the files which are not opened when it is being deleted
+		//hence the file does not have an entry in open file table	
+endif;
+
+//________________________________________________________________________
+
+SP = [protable + 13];
+ireturn;
