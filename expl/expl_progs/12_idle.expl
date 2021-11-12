@@ -1,11 +1,13 @@
 int main()
 {
     decl
+	str mystr;
         int a;
     enddecl
     begin
         while(1==1) do
-            a=1;
+	    mystr = "idle";
+            //a=exposcall("Write",-2, mystr);
         endwhile;
         return 0;
     end

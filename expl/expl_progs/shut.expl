@@ -1,0 +1,11 @@
+int main()
+{
+	decl
+		int ret;
+		str mystr;
+	enddecl
+	begin
+		ret = exposcall("Shutdown");	
+		return 0;
+	end
+}
